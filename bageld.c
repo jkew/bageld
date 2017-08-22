@@ -45,6 +45,7 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
+#include <gssapi.h>
 #include "bageld.h"
 #include "string.h"
 
@@ -100,6 +101,46 @@ int main(int argc, char *argv[]) {
     finished = 0;
     parent = root;
     curr = root;
+
+    int kerberosEnabled = 1;
+    if (kerberosEnabled) {
+      if (getenv("KRB5_KTNAME") == NULL) {
+	putenv("KRB5_KTNAME=bageld.keytab");
+      }
+      sockwrite("Please send your kerberos service ticket: ", newSd);
+      input = sockreadline(&inputLength, newSd);
+      gss_buffer_desc gbuf;
+      gbuf.length = inputLength;
+      gbuf.value = input;
+      printf("Recieved a kerberos service ticket of length %d [%s]\n", gbuf.length, gbuf.value);
+      int ctx = GSS_C_NO_CONTEXT;
+      OM_uint32 maj_stat, min_stat, gflags, lmin_s;
+      gss_buffer_desc outbuf;
+      gss_name_t name;
+      maj_stat = gss_accept_sec_context(&min_stat,
+					&ctx,
+					GSS_C_NO_CREDENTIAL,
+					&gbuf,
+					GSS_C_NO_CHANNEL_BINDINGS,
+					&name,
+					NULL,
+					&outbuf,
+					&gflags,
+					NULL,
+					NULL);
+
+
+      if (!strcmp("expected",input)) {
+        sockwrite("Good news; you are not an intruder!", newSd);
+	free(input);
+      } else {
+	sockwrite("Invalid kerberos ticket. You are denied access!", newSd);
+        close(newSd);
+	free(input);
+        continue;
+      }
+    }
+
     /* Creation of initial bagel in database */
     if (root->left == NULL && root->right == NULL
 	&& root->questionOrAnswer == NULL) {
