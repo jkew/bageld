@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
                      incomming connections */
 
   while (1) {
-    printf("Awaiting new connections on port %d", PORT);
+    printf("Awaiting new connections on port %d\n", PORT);
     cliLen = sizeof(cliAddr);
     newSd = accept(s, (struct sockaddr *) &cliAddr, &cliLen);
     if(newSd<0) {
@@ -112,25 +112,56 @@ int main(int argc, char *argv[]) {
       gss_buffer_desc gbuf;
       gbuf.length = inputLength;
       gbuf.value = input;
-      printf("Recieved a kerberos service ticket of length %d [%s]\n", gbuf.length, gbuf.value);
-      int ctx = GSS_C_NO_CONTEXT;
+      printf("KERBEROS: Recieved a kerberos service ticket of length %d [%s]\n", gbuf.length, gbuf.value);
+      gss_ctx_id_t ctx = GSS_C_NO_CONTEXT;
       OM_uint32 maj_stat, min_stat, gflags, lmin_s;
       gss_buffer_desc outbuf;
       gss_name_t name;
-      maj_stat = gss_accept_sec_context(&min_stat,
-					&ctx,
-					GSS_C_NO_CREDENTIAL,
-					&gbuf,
-					GSS_C_NO_CHANNEL_BINDINGS,
-					&name,
-					NULL,
-					&outbuf,
-					&gflags,
-					NULL,
-					NULL);
+      int authorized = 0;
+      do {
+	maj_stat = gss_accept_sec_context(&min_stat,
+					  &ctx,
+					  GSS_C_NO_CREDENTIAL,
+					  &gbuf,
+					  GSS_C_NO_CHANNEL_BINDINGS,
+					  &name,
+					  NULL,
+					  &outbuf,
+					  &gflags,
+					  NULL,
+					  NULL);
+	printf("KERBEROS: gss_accept_sec_context major: %d, minor: %d, outlen: %u, outflags: %x\n", maj_stat, min_stat, (unsigned int)outbuf.length, gflags);
+        switch (maj_stat) {
+	case GSS_S_CONTINUE_NEEDED:
+	  if (outbuf.length != 0) {
+            // Additional information needs to be sent to the client
+	    printf("KERBEROS: sending GSS response token of length %u\n", (unsigned int) outbuf.length);
+	    sockwrite("Here is something I think you need to know: [%s]", outbuf.value);
+	    gss_release_buffer(&lmin_s, &outbuf);
+	  }
+	  break;
+	case GSS_S_COMPLETE:
+	  authorized = 1;
+	  break;
+	default:
+	  gss_delete_sec_context(&lmin_s, &ctx, GSS_C_NO_BUFFER);
+	  gss_buffer_desc gmsg;
+	  OM_uint32   lmin_s, msg_ctx;
+	  char        msg_major[128], msg_minor[128];
+	  msg_ctx = 0;
+          gss_display_status(&lmin_s, maj_stat, GSS_C_GSS_CODE, GSS_C_NO_OID, &msg_ctx, &gmsg);
+          strlcpy(msg_major, gmsg.value, sizeof(msg_major));
+          gss_release_buffer(&lmin_s, &gmsg);
+          msg_ctx = 0;
+          gss_display_status(&lmin_s, min_stat, GSS_C_MECH_CODE, GSS_C_NO_OID, &msg_ctx, &gmsg);
+          strlcpy(msg_minor, gmsg.value, sizeof(msg_minor));
+          gss_release_buffer(&lmin_s, &gmsg);
+	  printf("KERBEROS: accepting GSS security context failed: %s: %s\n", msg_major, msg_minor);
+	}
+      } while (maj_stat == GSS_S_CONTINUE_NEEDED);
+      
 
-
-      if (!strcmp("expected",input)) {
+      if (authorized) {
         sockwrite("Good news; you are not an intruder!", newSd);
 	free(input);
       } else {
