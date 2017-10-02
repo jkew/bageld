@@ -20,10 +20,10 @@
    string.h
 
    Compilation: 
-   cc -Wall -ansi -pedantic -o bageld *.c
+   Use cmake
 
    Usage:
-   ./bageld
+   ./bageld [bagel database] [optional: kerberos keytab]
 
    Without a database, the program will first
    ask you for a bagel type. Then begin filling
@@ -117,9 +117,15 @@ unsigned char *base64_decode(const unsigned char *data,
     BIO_free_all(bio);
 
     return buffer;
-
 }
 
+void trim_right(unsigned char *data, size_t len) {
+    size_t curr = len - 1;
+    while (curr >= 0 && data[curr] <= ' ') {
+        data[curr] = '\0';
+        curr--;
+    }
+}
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -192,7 +198,6 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         printf("Connect from %s\n", inet_ntoa(cliAddr.sin_addr));
-
 
         if (kerberosEnabled) {
             OM_uint32 maj_stat, min_stat, gflags, lmin_s;
@@ -295,10 +300,9 @@ int main(int argc, char *argv[]) {
             sockwrite("No bagels in database, starting anew.\n", newSd);
             sockwrite("Give the name of a bagel: ", newSd);
             input = sockreadline(&inputLength, newSd);
-            if (inputLength == 0)
-                close(newSd);
+            trim_right(input, inputLength);
             root->questionOrAnswer = input;
-            sockwrite("Thank you.\n", newSd);
+            errno = sockwrite("Thank you.\n", newSd);
             close(newSd);
             finished = !finished;
         }
@@ -309,8 +313,10 @@ int main(int argc, char *argv[]) {
                 sockwrite("I guess you have a ", newSd);
                 sockwrite(curr->questionOrAnswer, newSd);
                 sockwrite(" bagel.\n", newSd);
-                sockwrite("Is this correct?[yes,no] > ", newSd);
+                errno = sockwrite("Is this correct?[yes,no] > ", newSd);
                 input = sockreadline(&inputLength, newSd);
+                trim_right(input, inputLength);
+
                 if (!strcmp("yes", input)) { /* Congrats message */
                     free(input);
                     finished = !finished;
@@ -319,8 +325,9 @@ int main(int argc, char *argv[]) {
                     printf("done\n");
                 } else if (!strcmp("no", input)) { /* Create new node */
                     free(input);
-                    sockwrite("No? Then what type of bagel is it? > ", newSd);
+                    errno = sockwrite("No? Then what type of bagel is it? > ", newSd);
                     input = sockreadline(&inputLength, newSd);
+                    trim_right(input, inputLength);
                     right = createnode();
                     right->questionOrAnswer = input;
                     right->question = 0;
@@ -332,6 +339,7 @@ int main(int argc, char *argv[]) {
                     sockwrite(curr->questionOrAnswer, newSd);
                     sockwrite(" bagels? > ", newSd);
                     input = sockreadline(&inputLength, newSd);
+                    trim_right(input, inputLength);
                     parent = createnode();
                     parent->questionOrAnswer = input;
                     parent->question = 1;
@@ -344,22 +352,21 @@ int main(int argc, char *argv[]) {
                     else if (root == parent->left)
                         root = parent;
                     curr = root;
-                    sockwrite("\n\nI'm sure I'll guess it now.", newSd);
+                    errno = sockwrite("I'm sure I'll guess it now.", newSd);
                     finished = !finished;
                     printf("Closing connection...");
                     close(newSd);
                     printf("done\n");
                 } else {
                     free(input);
-                    sockwrite("\nPlease answer \"yes\" or \"no\".\n", newSd);
+                    errno = sockwrite("Please answer \"yes\" or \"no\".\n", newSd);
                 }
 
             } else { /* At question node */
-                sockwrite("\n", newSd);
                 sockwrite(curr->questionOrAnswer, newSd);
-                sockwrite(" > ", newSd);
+                errno = sockwrite(" > ", newSd);
                 input = sockreadline(&inputLength, newSd);
-                printf("Input: %s\n", input);
+                trim_right(input, inputLength);
                 if (!strcmp("yes", input)) { /* Goto right node */
                     prev = curr;
                     path = RIGHT;
@@ -369,13 +376,9 @@ int main(int argc, char *argv[]) {
                     path = LEFT;
                     curr = curr->left;
                 } else
-                    sockwrite("\nPlease answer \"yes\" or \"no\".\n", newSd);
+                    errno = sockwrite("Please answer \"yes\" or \"no\".\n", newSd);
                 free(input);
             }
-            int error = 0;
-            socklen_t len = sizeof (error);
-            if (getsockopt (newSd, SOL_SOCKET, SO_ERROR, &error, &len))
-                finished = !finished;
         }
         printf("Saving data...");
         saveToFile("bagels.db", root);

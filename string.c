@@ -57,7 +57,7 @@ unsigned char* sockreadline(int *numchars, int fd) {
   } else
     *(out+numc) = '\0';
   *numchars = numc + 1;
-  printf("BAGELD: RECEIVED [%s]\n", out);
+  printf("BAGELD: RECEIVED (%d) [%s]\n\n", *numchars, out);
   return out;
 }
 

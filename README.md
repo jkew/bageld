@@ -1,9 +1,9 @@
-bageld
+Bagel DB
 ======
 
-Bageld - A high-performance, network enabled 
-system for the organization, storage, and 
-retrieval of Bagel information
+Bagel DB - An enterprise-grade high-performance,
+network enabled system for the organization,
+storage, and retrieval of bagel information
 
 John V. Kew
 Assignment 2
@@ -24,11 +24,13 @@ string.c
 string.h
 
 ## Compilation:
-cc -Wall -ansi -pedantic -o bageld *.c
+cmake
+  OR
+cc -Wall -ansi -pedantic -o bageld *.c -l krb5 -lssl
 
 ## Usage:
 ```
-./bageld
+./bageld bagel.db [kerberos_keytab]
 Awaiting new connections on port 2002
 ```
 
