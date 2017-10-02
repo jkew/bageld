@@ -1,4 +1,6 @@
 cmake_minimum_required (VERSION 2.6)
 project (Bageld)
+link_directories(/usr/local/opt/openssl/lib)
+include_directories(/usr/local/include)
 add_executable(Bageld bageld.c string.c)
-target_link_libraries(Bageld krb5 ssl)
+target_link_libraries(Bageld krb5 crypto)

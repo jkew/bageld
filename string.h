@@ -9,7 +9,7 @@
    the integer pointed to by numchars to the
    number of characters. Nico, help me destroy 
    Caleb, he stands funny.*/
-char * readline(int *numchars, FILE *instream);
-char* sockreadline(int *numchars, int fd);
-int sockwrite(char *string, int fd);
+unsigned char * readline(int *numchars, FILE *instream);
+unsigned char* sockreadline(int *numchars, int fd);
+int sockwrite(unsigned char *string, int fd);
 #endif
